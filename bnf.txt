@@ -1,0 +1,385 @@
+// 自分がわかればいいんだよそれで。これ解析するわけじゃないんだし。
+
+// ----------------------
+// コメント
+// コメント発見した瞬間にコメント末尾まで読み飛ばせばいいんだろうか。
+
+// 行コメント
+<comment> ::= "//" [^\r\n]* <endline>
+
+// 行じゃないコメントはいまのところ無いよ。
+
+
+// ----------------------
+// 本体
+
+<kizuna> ::= <module>
+
+// ----------------------
+// もじゅーる
+
+<module> ::= <statement>*
+
+// ----------------------
+// 文
+
+<statement> ::= <nop_statement>
+              | <import_statement>
+              | <export_statement>
+              | <let_statement>
+              | <assign_statement>
+              | <if_statement>
+              | <switch_statement>
+              | <match_statement>
+              | <for_statement>
+              | <while_statement>
+              | <labeled_statement>
+              | <jump_statement>
+              | <compound_statement>
+              | <use_declaration>
+              | <function_definition>
+              | <type_definition>
+              | <module_definition>
+              | <expression_statement>
+
+// なにもしない文は区切り文字としても優秀（ほんまか）
+<nop_statement> ::= "nop"
+                  | "ignore" <expression>
+                  | ";" // ";" が余ってたので。余らなかったら消す。
+
+<import_statement> ::= "import" <string_literal> ("as" <argument>)?
+
+<export_statement> ::= "export" "default"
+                     | "export" "global"
+                     | "export" <expression>
+
+<let_statement> ::= "let"? "mutable"? <argument> "=" <expression>
+
+<assign_statement> ::= "assign"? <argument> "<-" <expression>
+
+<if_statement> ::= "if" <expression> "then" <statement> "else" <statement>
+
+<switch_statement> ::= "switch" <expression> <statement>
+
+<match_statement> ::= "match" <expression> "{" <_guard_statement> "}"
+
+<for_statement> ::= "for" <argument> "in" <expression> <statement>
+
+<while_statement> ::= "while" <expression> <statement>
+
+<try_statement> ::= "try" <statement> "catch"? "{" <_guard_statement> "}"
+
+<labeled_statement> ::= "label" <identifier> "in" <statement>
+                      | "case" <argument> "in" <statement>
+                      | "default" "in" <statement>
+
+<jump_statement> ::= "goto" <identifier>
+                   | "continue"
+                   | "break"
+                   | "return" <expression>
+
+<compound_statement> ::= "{" <statement>* "}"
+
+<expression_statement> ::= <expression>
+
+<_guard_statement> ::= ("|"? <argument> ("when" <expression>)? "=>" <statement>)+
+
+// ----------------------
+// declaration
+
+<use_declaration> ::= "use" <member_selective_expression>
+
+// ----------------------
+// 定義
+
+<program_definition> ::= "program" <identifier> <argument> <function_qualifer> <compound_statement>
+
+<function_definition> ::= "function" <identifier> <argument> <function_qualifer> <compound_statement>
+
+<type_definition> ::= "type" <identifier>+ "=" <type>
+
+<module_definition> ::= "module" <identifier> "{" <module> "}"
+
+// ----------------------
+// 式
+
+<expression> ::= <type_specified_expression>
+
+<type_specified_expression> ::= <lambda_expression> ("--" <type>)?
+
+<lambda_expression> ::= "lambda"? <argument> <function_qualifer> "=>" <lambda_expression>
+                      | <throw_expression>
+
+<throw_expression> ::= "throw" <expression>
+                     | <let_in_expression>
+
+<let_in_expression> ::= "let" <argument> "=" <expression> "in" <expression>
+                      | <conditional_expression>
+
+<conditional_expression> ::= <if_expression>
+                           | <match_expression>
+                           | <try_expression>
+                           | <logical_or_expression>
+                           where
+                             <if_expression> ::= "if" <expression> "then" <expression> "else" <expression>
+                             <match_expression> ::= "match" <expression> "{" <_guard_expression> "}"
+                             <try_expression> ::= "try" <expression> "catch"? "{" <_guard_expression> "}"
+
+<_guard_expression> ::= ("|"? <argument> ("when" <expression>)? "=>" <expression>)+
+
+<logical_or_expression> ::= <logical_and_expression> ("||" <logical_and_expression>)*
+                          | <logical_and_expression> ("or" <logical_and_expression>)*
+
+<logical_and_expression> ::= <compare_expression> ("&&"  <compare_expression>)*
+                           | <compare_expression> ("and" <compare_expression>)*
+
+<compare_expression> ::= <sequence_expression> "<" <sequence_expression> "<" <sequence_expression>
+                       | <sequence_expression> "<" <sequence_expression>
+                       | <sequence_expression> "<=" <sequence_expression>
+                       | <sequence_expression> ">" <sequence_expression>
+                       | <sequence_expression> ">=" <sequence_expression>
+                       | <sequence_expression> "==" <sequence_expression>
+                       | <sequence_expression> "<>" <sequence_expression>
+                       | <sequence_expression>
+
+// integer_sequence
+<sequence_expression> ::= <operator_append_expression> ".." <operator_append_expression>
+                        | <operator_append_expression>
+
+// リストの結合とか
+<operator_append_expression> ::= <additive_expression> ("++" <additive_expression>)*
+                               | <additive_expression> ("cons" <additive_expression>)*
+
+// 足し算とか
+<additive_expression> ::= <multiplicative_expression> ("+" <multiplicative_expression>)*
+                        | <multiplicative_expression> ("-" <multiplicative_expression>)*
+
+// 掛け算とか
+<multiplicative_expression> ::= <powered_expression> ("*" <multiplicative_expression>)*
+                              | <powered_expression> ("/" <multiplicative_expression>)*
+                              | <powered_expression> ("%" <multiplicative_expression>)*
+
+// べき乗
+<powered_expression> ::= <unary_expression> ("**" <unary_expression>)*
+
+// 前置 単項演算子 (改行を越えてもいいや。)
+<unary_expression> ::= "not" <unary_expression>
+                     | "new" <unary_expression>
+                     | "delete" <unary_expression>
+                     | "sizeof" <unary_expression>
+                     | "typeof" <unary_expression>
+                     | "instanceof" <unary_expression>
+                     | <postfix_expression>
+
+// 後置 単項演算子 (改行を越えてもいいや。)
+<postfix_expression> ::= <function_call_expression> "..."
+                       | <function_call_expression> "!"
+                       | <function_call_expression>
+
+// 関数呼び出し (改行を越えない)
+<function_call_expression> ::= <subscript_expression>+ [[spaces_without_endline]]
+
+// 添字式 (改行を越えない)
+<subscript_expression> ::= <member_selective_expression> (".[" <expression> "]")* [[spaces_without_endline]]
+
+// メンバ選択演算子 (改行を越えない)
+<member_selective_expression> ::= <factor> ("." <identifier>)* [[spaces_without_endline]]
+
+<argument> ::= <factor> | <underscore>
+
+<factor> ::= <void_literal>
+           | <int_literal>
+           | <double_literal>
+           | <string_literal>
+           | <bool_literal>
+           | <array_literal>
+           | <tuple_literal>
+           | <module_literal>
+           | <identifier>
+
+// ----------------------
+// 型
+
+<type> ::= <variant_type>
+
+<variant_type> ::= <_type_factor> ("|" <_type_factor>)*
+                 where
+                   <_type_factor> ::= <primitive_type>
+                                    | <tuple_type>
+                                    | <array_type>
+                                    | <decltype>
+                                    | <constructive_type>
+
+<tuple_type> ::= "(" <type> ("," <type>)* ")"
+
+<array_type> ::= "[" <type> "]"
+
+<decltype> ::= "decltype" "(" <expression> ")"
+
+<constructive_type> ::= <identifier> <type>* [[spaces_without_endline]]
+
+<primitive_type> ::= "void"
+                   | "bool"
+                   | "int"
+                   | "double"
+                   | "binary"
+                   | "string"
+
+
+// ----------------------
+// リテラル
+
+<int_literal> ::= <bin_literal>
+                | <hex_literal>
+                | <oct_literal>
+                | <dec_literal>
+                where
+                  <bin_literal> ::= [0][b][01]+
+                  <hex_literal> ::= [0][Xx][1-9A-Fa-f]+
+                  <oct_literal> ::= [0][0-7]+
+                  <dec_literal> ::= [1-9][0-9]*
+
+<double_literal> ::= [0-9]+\.[0-9]+
+
+<string_literal> ::= ["] [^"]* ["]
+                   | ['] [^']* [']
+                   | [`] [^`]* [`]
+
+<bool_literal> ::= "true" | "false"
+
+<array_literal> ::= "[" "]"
+                  | "[" <expression> ("," <expression>)* "]"
+
+<tuple_literal> ::= "(" ")"
+                  | "(" <expression> ("," <expression>)* ")"
+
+<module_literal> ::= "global" // 定義済みモジュール
+
+
+// ----------------------
+// 特殊キーワードとか
+
+<function_qualifer> ::= ( "pure"
+                        | "noexcept"
+                        | "noconst" // ?
+                        | "mutable"
+                        )*
+
+// _cv_qualifer ???
+<variable_qualifer> ::= ( "const" // ?
+                        | "volatile"
+                        | "mutable"
+                        | "reference"
+                        )*
+
+<underscore> ::= "_"
+               | "(" <underscore> ")" // warning: この括弧不要ではないだろうか。
+
+
+// ----------------------
+// なにこれ
+
+
+
+<digit> ::= [0-9]
+<endline> ::= [\r\n]
+<identifier> ::= [A-Za-z][A-Za-z_-]* // ※ただし<keyword>を除く
+<keyword> ::= "kizuna"
+            | "_" // パターンマッチに使う特殊identifier。この変数/引数を使用しないことを意味する。
+            | "and" // 論理積。
+            | "array" // 生配列の型。identifierとして使いたいので廃止予定。
+            | "assign" // 代入式であることを明示。なくてもparseできそうだしいらないかも。
+            | "async"
+            | "at"
+            | "auto"
+            | "await"
+            | "binary" // バイナリ用型。[char] のエイリアス。
+            | "bool"
+            | "break" // jump文。ループを脱出する。
+            | "call"
+            | "case" // switchの友達。
+            | "cast"
+            | "catch" // tryの友達
+            | "char" // 型。1バイトである。
+            | "concept"
+            | "cons" // リスト結合。うーん
+            | "const" // この変数は変更しません。
+            | "constexpr" // これはコンパイル時定数です。
+            | "continue" // jump文。ループをやり直す。
+            | "decltype" // 型を得る。
+            | "default"
+            | "delete" // 確保した領域を削除。
+            | "do"
+            | "done"
+            | "double" // 型。倍精度浮動小数点数型。
+            | "else" // if then else
+            | "export"
+            | "false" // bool型のリテラル
+            | "for" // ループしようぜお前イテレータな
+            | "forall" // 全ての型が属する型クラス？
+            | "function" // これは関数です。
+            | "generic"
+            | "goto" // きららジャンプ
+            | "if" // if式,if文
+            | "import" // モジュールインポート文
+            | "in" // for .... in .... とか let .... in .... とか
+            | "instanceof" // 型クラスに属しているかどうか・・・・で
+            | "int" // 型。std::int64_t
+            | "is"
+            | "lambda" // 吾輩はラムダ式である。名前はまだ無い。
+            | "let" // let文、let in式
+            | "match" // match式,match文
+            | "module" // これはもじゅーるですよー。
+            | "move" // 俺はいまからムーブするっっ！！
+            | "mutable" // 私実は中身変わります。
+            | "namespace"
+            | "new" // メモリ確保。14時35分。
+            | "no"
+            | "noexcept" // 例外を投げません。ほんとです。
+            | "nop" // なにもしません。
+            | "not" // 論理否定
+            | "null"
+            | "of"
+            | "optional"
+            | "or" // 論理和
+            | "private"
+            | "program"
+            | "protected"
+            | "public"
+            | "pure" // これは純粋関数です。
+            | "read" // 演算子。readable #a => string => #a
+            | "readable" // 型クラス？
+            | "recursive_call" // lambda式内で再帰したい変態向け。
+            | "reference" // 参照？
+            | "requires"
+            | "return" // return文。
+            | "show" // 演算子。showable #a => string
+            | "showable" // 型クラス。
+            | "sizeof"
+            | "string" // 型。文字列型。
+            | "swap" // スワップ文。いらなくね？
+            | "switch"
+            | "tag"
+            | "template"
+            | "then" // if then else
+            | "this"
+            | "throw" // 例外を投げます。
+            | "true" // bool型のリテラル
+            | "try" // catchの友達
+            | "tuple" // 廃止予定
+            | "type" // これは型だ
+            | "typename"
+            | "typeof" // 演算子。forall #a => string
+            | "uint" // 型。unsigned int
+            | "unit" // 型。voidの別名候補。uintと紛らわしいのが特徴。
+            | "use" // using
+            | "void" // 型。"()"
+            | "volatile"
+            | "wait"
+            | "what"
+            | "where"
+            | "while" // ループ
+            | "with"
+            | "xor"
+            | "yield"
+
