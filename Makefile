@@ -28,6 +28,8 @@ TARGETDIR := $(dir $(TARGET))
 
 all: $(TARGET)
 
+init:
+
 $(TARGET): $(OBJS) $(LIBS)
 	@$(MKDIR) $(TARGETDIR)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
@@ -52,5 +54,5 @@ pretend:
 
 -include $(DEPENDS)
 
-.PHONY: all clean run pretend init install uninstall
+.PHONY: all init clean run pretend install uninstall
 
