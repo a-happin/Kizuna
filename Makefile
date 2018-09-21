@@ -9,7 +9,6 @@ LIBS :=
 RM := rm -fv
 MKDIR := mkdir -p
 
-BINDIR := ./bin
 BUILDDIR := ./build
 OBJDIR := $(BUILDDIR)
 SRCDIR := ./src
@@ -23,15 +22,14 @@ OBJS := $(subst $(SRCDIR)/,$(OBJDIR)/, $(SRCS:.cpp=.o))
 DEPENDS := $(OBJS:.o=.d)
 
 # exeutable file
-TARGET := $(BINDIR)/a.out
+TARGET := ./bin/a.out
+
+TARGETDIR := $(dir $(TARGET))
 
 all: $(TARGET)
 
-debug:
-	$(MAKE) CPPFLAGS+=-DDEBUG
-
 $(TARGET): $(OBJS) $(LIBS)
-	@$(MKDIR) $(BINDIR)
+	@$(MKDIR) $(TARGETDIR)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
 # compile ./*.cpp => ./*.o
@@ -54,5 +52,5 @@ pretend:
 
 -include $(DEPENDS)
 
-.PHONY: all clean run pretend debug release
+.PHONY: all clean run pretend init install uninstall
 
