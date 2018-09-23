@@ -16,7 +16,7 @@ SRCDIR := ./src
 SRCS := $(wildcard $(SRCDIR)/*.cpp)
 
 # ./src/*.cpp => ./build/*.o
-OBJS := $(subst $(SRCDIR)/,$(OBJDIR)/, $(SRCS:.cpp=.o))
+OBJS := $(subst $(SRCDIR)/,$(OBJDIR)/,$(SRCS:.cpp=.o))
 
 # ./build/*.o => ./build/*.d
 DEPENDS := $(OBJS:.o=.d)
