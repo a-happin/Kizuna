@@ -1,5 +1,5 @@
-#ifndef KIZUNA_OMAJINAI
-#define KIZUNA_OMAJINAI
+#ifndef KIZUNA_OMAJINAI_HPP
+#define KIZUNA_OMAJINAI_HPP
 #include <iostream>
 
 namespace kizuna

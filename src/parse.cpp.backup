@@ -71,13 +71,13 @@ auto main () -> int
 {
   kizuna::omajinai ();
 
-  auto source = kizuna::get_source (std::cin);
+  auto source = kizuna::file_to_string (std::cin);
 
   auto p = kizuna::make_packed_iterator (source);
 
   try
   {
-    auto c = kizuna::parse_int_literal (p);
+    auto c = kizuna::parse (p);
     std::cout << "Parse succeeded: " << c.token << std::endl;
   }
   catch (const char * error)
