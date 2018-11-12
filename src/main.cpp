@@ -70,10 +70,11 @@ namespace kizuna
 
     // なんかいい感じのエラーメッセージを生成する
     // 雑すぎない？
-    auto generate_error (const std::string & message) const
+    auto generate_error (const std::string & message , int error_level = 2) const
     {
+      static const char * error_string [] = {"\033[1;32msuggestion: " , "\033[1;33mwarning: " , "\033[1;31merror: "};
       std::ostringstream ss;
-      ss << "\033[1m" << filename << ":" << line << ":" << col << ": \033[1;31merror: \033[0m\033[1m" << message << std::endl;
+      ss << "\033[1m" << filename << ":" << line << ":" << col << ": " << error_string [error_level] << "\033[0m\033[1m" << message << std::endl;
       ss << "\033[0m" << current_line () << std::endl;
       for (decltype (col) i = 1; i < col; ++ i)
       {
@@ -142,25 +143,17 @@ namespace kizuna
     {
       if (is_eof ())
       {
-        throw generate_error ("unexpected EOF in input_stream::peek () const");
+        throw generate_error ("unexpected EOF");
       }
       return (* ite);
     }
 
 
-
     auto get ()
     {
-      if (is_eof ())
-      {
-        throw generate_error ("unexpected EOF in input_stream::get ()");
-      }
-      auto && res = * ite;
+      auto && res = peek ();
       skip1 ();
       return res;
-
-      // [[deprecated]]
-      // return (* ite ++);
     }
 
 
@@ -263,28 +256,124 @@ namespace kizuna
   }
 
 
-  inline auto parse_int (input_stream & s)
+  inline auto parse_decimal_int_literal (input_stream & s)
   {
     s.skip_spaces ();
-    auto backup = s.get_iterator ();
-    while (s.is_digit ())
+    if ('1' <= s.peek () && s.peek () <= '9')
     {
-      s.skip1 ();
+      auto begin = s.get_iterator ();
+      do
+      {
+        s.skip1 ();
+      } while (s.is_digit ());
+      return std::string {begin , s.get_iterator ()};
     }
-    if (backup == s.get_iterator ())
+    else
     {
-      throw s.generate_error ("not int literal");
+      throw s.generate_error ("not decimal int literal");
     }
-    return std::string {backup , s.get_iterator ()};
   }
+
+
+  inline auto parse_octal_int_literal (input_stream & s)
+  {
+    s.skip_spaces ();
+    if (s.peek () == '0')
+    {
+      auto begin = s.get_iterator ();
+      do
+      {
+        s.skip1 ();
+      } while ('0' <= s.peek () && s.peek () <= '7');
+      return std::string {begin , s.get_iterator ()};
+    }
+    else
+    {
+      throw s.generate_error ("not octal int literal");
+    }
+  }
+
+
+  inline auto parse_hexadecimal_int_literal (input_stream & s)
+  {
+    s.skip_spaces ();
+    if (s.peek () == '0')
+    {
+      auto begin = s.get_iterator ();
+      s.skip1 ();
+      if (s.peek () == 'x' || s.peek () == 'X')
+      {
+        s.skip1 ();
+      }
+      else
+      {
+        throw s.generate_error ("not hexadecimal int literal");
+      }
+      if (s.is_digit () || ('A' <= s.peek () && s.peek () <= 'F') || ('a' <= s.peek () && s.peek () <= 'f'))
+      {
+        s.skip1 ();
+      }
+      else
+      {
+        throw s.generate_error ("not hexadecimal int literal");
+      }
+      while (s.is_digit () || ('A' <= s.peek () && s.peek () <= 'F') || ('a' <= s.peek () && s.peek () <= 'f'))
+      {
+        s.skip1 ();
+      }
+      return std::string {begin , s.get_iterator ()};
+    }
+    else
+    {
+      throw s.generate_error ("not hexadecimal int literal");
+    }
+  }
+
+
+  inline auto parse_int_literal (input_stream & s)
+  {
+    auto backup = s;
+    std::ostringstream ss;
+    try
+    {
+      auto res = parse_decimal_int_literal (s);
+      return res;
+    }
+    catch (const std::runtime_error & e)
+    {
+      s = backup;
+      ss << e.what () << std::endl;
+    }
+    try
+    {
+      auto res = parse_hexadecimal_int_literal (s);
+      return res;
+    }
+    catch (const std::runtime_error & e)
+    {
+      s = backup;
+      ss << e.what () << std::endl;
+    }
+    try
+    {
+      auto res = parse_octal_int_literal (s);
+      return res;
+    }
+    catch (const std::runtime_error & e)
+    {
+      ss << e.what () << std::flush;
+      throw std::runtime_error {ss.str ()};
+    }
+  }
+
 
 } // namespace kizuna
 
 
 inline auto parse (kizuna::input_stream & s)
 {
-  auto res = kizuna::parse_int (s);
-  kizuna::parse_eof (s);
+  auto res = kizuna::parse_int_literal (s);
+  // kizuna::parse_eof (s);
   return res;
 }
 
