@@ -1,184 +1,414 @@
 #ifndef KIZUNA_PARSER_HPP
 #define KIZUNA_PARSER_HPP
+
+#include <sstream>
 #include <string>
-#include <utility>
-#include <kizuna/ast.hpp>
 
+#include <kizuna/input_stream.hpp>
+#include <kizuna/exception.hpp>
 
-namespace kizuna
+namespace kizuna::parser
 {
 
-  struct parser
+  struct eof_error : exception
   {
-
-  private:
-
-    using value_type = std::string::iterator;
-
-    value_type ite;
-    value_type end;
-    std::int64_t line;
-    std::int64_t col;
-
-  public:
-
-    parser (std::string & s) noexcept
-      : ite {s.begin ()}
-      , end {s.end ()}
-      , line (1)
-      , col (1)
+    eof_error (const input_stream & x)
+      : exception {x.generate_error ("expected EOF, but not EOF")}
     {}
-
-
-    auto is_eof () const noexcept
-    {
-      return ite == end;
-    }
-
-
-    auto peek () const
-    {
-      if (is_eof ())
-      {
-        throw "Error: out_of_range";
-      }
-      return (* ite);
-    }
-
-
-    auto peek ()
-    {
-      if (is_eof ())
-      {
-        throw "Error: out_of_range";
-      }
-      return (* ite);
-    }
-
-
-    auto get ()
-    {
-      if (is_eof ())
-      {
-        throw "Error: out_of_range";
-      }
-      ++ col;
-      return * ite ++;
-    }
-
-
-    auto next ()
-    {
-      if (is_eof ())
-      {
-        throw "Error: out_of_range";
-      }
-      ++ col;
-      ++ ite;
-    }
-
-
-
-    auto is_char (char c) const noexcept
-    {
-      return ! is_eof () && peek () == c;
-    }
-
-
-    auto is_digit () const noexcept
-    {
-      return ! is_eof () && '0' <= peek () && peek () <= '9';
-    }
-
-
-    auto is_upper () const noexcept
-    {
-      return ! is_eof () && 'A' <= peek () && peek () <= 'Z';
-    }
-
-
-    auto is_lower () const noexcept
-    {
-      return ! is_eof () && 'a' <= peek () && peek () <= 'z';
-    }
-
-
-    auto is_alpha () const noexcept
-    {
-      return ! is_eof () && (is_upper () || is_lower ());
-    }
-
-
-    auto is_letter () const noexcept
-    {
-      return ! is_eof () && (is_alpha () || is_char ('_'));
-    }
-
-
-    auto is_letternum () const noexcept
-    {
-      return ! is_eof () && (is_letter () || is_digit () || is_char ('-'));
-    }
-
-
-    auto is_endline () const noexcept
-    {
-      return ! is_eof () && (is_char ('\n') || is_char ('\r'));
-    }
-
-
-    auto is_space () const noexcept
-    {
-      return ! is_eof () && (is_char (' ') || is_char ('\t') || is_endline ());
-    }
-
-
-    auto skip_space () noexcept
-    {
-      while (is_space ())
-      {
-        next ();
-      }
-    }
-
-
-    auto get_rest () const noexcept
-    {
-      return std::string {ite , end};
-    }
-
-
-    auto parse_anychar ()
-    {
-      return get ();
-    }
-
-
-    auto parse_char (char c)
-    {
-      return is_char (c) ? get () : throw "Parse failed: not match in parse_char";
-    }
-
-
-    auto parse_int_literal ()
-    {
-      skip_space ();
-      auto backup = ite;
-      while (is_digit ())
-      {
-        next ();
-      }
-      // 変化なし => 数字じゃない
-      if (backup == ite)
-      {
-        throw "Parse failed: not int_literal";
-      }
-      return ast::ast_base {std::string {backup , ite} , std::string {"int"} , {}};
-    }
-
+    using exception::what;
   };
 
-} // namespace kizuna
+
+  struct not_decimal_int_literal_error : exception
+  {
+    not_decimal_int_literal_error (const input_stream & x)
+      : exception {x.generate_error ("not decimal int literal")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_octal_int_literal_error : exception
+  {
+    not_octal_int_literal_error (const input_stream & x)
+      : exception {x.generate_error ("not octal int literal")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_octal_character_error : exception
+  {
+    not_octal_character_error (const input_stream & x)
+      : exception {x.generate_error ("8進数ではない文字")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_hexadecimal_int_literal_error : exception
+  {
+    not_hexadecimal_int_literal_error (const input_stream & x)
+      : exception {x.generate_error ("not hexadecimal int literal")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_hexadecimal_character_error : exception
+  {
+    not_hexadecimal_character_error (const input_stream & x)
+      : exception {x.generate_error ("16進数ではない文字")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_int_literal_error : exception
+  {
+    not_int_literal_error (const input_stream & x)
+      : exception {x.generate_error ("not int literal")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_double_literal_error : exception
+  {
+    not_double_literal_error (const input_stream & x)
+      : exception {x.generate_error ("not double literal")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_illegal_double_literal_error : exception
+  {
+    not_illegal_double_literal_error (const input_stream & x)
+      : exception {x.generate_error ("不正なdouble型リテラル")}
+    {}
+    using exception::what;
+  };
+
+
+  struct unknown_literal_suffix_error : exception
+  {
+    unknown_literal_suffix_error (const input_stream & x)
+      : exception {x.generate_error ("unknown literal suffix")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_literal_error : exception
+  {
+    not_literal_error (const input_stream & x)
+      : exception {x.generate_error ("not literal")}
+    {}
+    using exception::what;
+  };
+
+
+  struct not_word_error : exception
+  {
+    not_word_error (const input_stream & x)
+      : exception {x.generate_error ("not word")}
+    {}
+    using exception::what;
+  };
+
+
+  // EOF
+  inline auto parse_eof (input_stream & s)
+  {
+    s.skip_spaces ();
+    if (! s.is_eof ())
+    {
+      throw eof_error {s};
+    }
+  }
+
+
+  inline auto parse_anychar (input_stream & s)
+  {
+    return s.get ();
+  }
+
+
+  // -?[1-9][0-9]*
+  inline auto parse_decimal_int_literal (input_stream & s)
+  {
+    s.skip_spaces ();
+    auto begin = s.get_iterator ();
+
+    // -?
+    if (s.peek () == '-')
+    {
+      s.skip1 ();
+    }
+
+    // [1-9]
+    if ('1' <= s.peek () && s.peek () <= '9')
+    {
+      s.skip1 ();
+    }
+    else
+    {
+      throw not_decimal_int_literal_error {s};
+    }
+
+    // [0-9]*
+    while (s.is_digit ())
+    {
+      s.skip1 ();
+    }
+
+    // suffix check
+    if (s.is_letter ())
+    {
+      throw unknown_literal_suffix_error {s};
+    }
+
+    return std::string {begin , s.get_iterator ()};
+  }
+
+
+  // -?0[0-7]*
+  inline auto parse_octal_int_literal (input_stream & s)
+  {
+    s.skip_spaces ();
+    auto begin = s.get_iterator ();
+
+    // -?
+    if (s.peek () == '-')
+    {
+      s.skip1 ();
+    }
+
+    // 0
+    if (s.peek () == '0')
+    {
+      s.skip1 ();
+    }
+    else
+    {
+      throw not_octal_int_literal_error {s};
+    }
+
+    // [0-7]*
+    while ('0' <= s.peek () && s.peek () <= '7')
+    {
+      s.skip1 ();
+    }
+
+    // suffix check
+    if (s.is_digit () || s.is_letter ())
+    {
+      throw not_octal_character_error {s};
+    }
+
+    return std::string {begin , s.get_iterator ()};
+  }
+
+
+  // -?0[Xx][0-9A-Fa-f]+
+  inline auto parse_hexadecimal_int_literal (input_stream & s)
+  {
+    s.skip_spaces ();
+    auto begin = s.get_iterator ();
+
+    // -?
+    if (s.peek () == '-')
+    {
+      s.skip1 ();
+    }
+
+    // 0
+    if (s.peek () == '0')
+    {
+      s.skip1 ();
+    }
+    else
+    {
+      throw not_hexadecimal_int_literal_error {s};
+    }
+
+    // [Xx]
+    if (s.peek () == 'x' || s.peek () == 'X')
+    {
+      s.skip1 ();
+    }
+    else
+    {
+      throw not_hexadecimal_int_literal_error {s};
+    }
+
+
+    // [0-9A-Fa-f]
+    if (s.is_digit () || ('A' <= s.peek () && s.peek () <= 'F') || ('a' <= s.peek () && s.peek () <= 'f'))
+    {
+      s.skip1 ();
+    }
+    else
+    {
+      throw not_hexadecimal_character_error {s};
+    }
+
+    // [0-9A-Fa-f]*
+    while (s.is_digit () || ('A' <= s.peek () && s.peek () <= 'F') || ('a' <= s.peek () && s.peek () <= 'f'))
+    {
+      s.skip1 ();
+    }
+
+    // suffix check
+    if (s.is_letter ())
+    {
+      throw not_hexadecimal_character_error {s};
+    }
+
+    return std::string {begin , s.get_iterator ()};
+  }
+
+
+  inline auto parse_int_literal (input_stream & s)
+  {
+    auto backup = s;
+    try
+    {
+      return parse_hexadecimal_int_literal (s);
+    }
+    catch (const not_hexadecimal_int_literal_error &)
+    {
+      s = backup;
+    }
+
+    try
+    {
+      return parse_octal_int_literal (s);
+    }
+    catch (const not_octal_int_literal_error &)
+    {
+      s = backup;
+    }
+
+    try
+    {
+      return parse_decimal_int_literal (s);
+    }
+    catch (const not_decimal_int_literal_error &)
+    {
+      // s = backup;
+    }
+
+    throw not_int_literal_error (s);
+  }
+
+
+  // -?[0-9]+\.[0-9]+
+  inline auto parse_double_literal (input_stream & s)
+  {
+    s.skip_spaces ();
+    auto begin = s.get_iterator ();
+
+    // -?
+    if (s.peek () == '-')
+    {
+      s.skip1 ();
+    }
+
+    // [0-9]+
+    if (! s.is_digit ())
+    {
+      throw not_double_literal_error {s};
+    }
+    do
+    {
+      s.skip1 ();
+    } while (s.is_digit ());
+
+    // \.
+    if (s.peek () == '.')
+    {
+      s.skip1 ();
+    }
+    else
+    {
+      throw not_double_literal_error {s};
+    }
+
+    // [0-9]+
+    if (! s.is_digit ())
+    {
+      throw not_double_literal_error {s};
+    }
+    do
+    {
+      s.skip1 ();
+    } while (s.is_digit ());
+
+    // suffix check
+    if (s.is_letter ())
+    {
+      throw unknown_literal_suffix_error {s};
+    }
+
+    return std::string {begin , s.get_iterator ()};
+  }
+
+
+  inline auto parse_literal (input_stream & s)
+  {
+    auto backup = s;
+
+    try
+    {
+      return parse_double_literal (s);
+    }
+    catch (const not_double_literal_error &)
+    {
+      s = backup;
+    }
+
+    try
+    {
+      return parse_int_literal (s);
+    }
+    catch (const not_int_literal_error &)
+    {
+      // s = backup;
+    }
+
+    throw not_literal_error {s};
+  }
+
+
+  // [A-Za-z_][0-9A-Za-z_-]*
+  inline auto parse_word (input_stream & s)
+  {
+    s.skip_spaces ();
+    auto begin = s.get_iterator ();
+
+    // [A-Za-z_]
+    if (s.is_letter ())
+    {
+      s.skip1 ();
+    }
+    else
+    {
+      throw not_word_error {s};
+    }
+
+    // [0-9A-Za-z_-]*
+    while (s.is_letter_tail ())
+    {
+      s.skip1 ();
+    }
+
+    return std::string {begin , s.get_iterator ()};
+  }
+
+};
 
 #endif
+
 
