@@ -1,7 +1,6 @@
 #ifndef KIZUNA_PARSER_HPP
 #define KIZUNA_PARSER_HPP
 
-#include <sstream>
 #include <string>
 
 #include <kizuna/input_stream.hpp>
@@ -37,10 +36,10 @@ namespace kizuna::parser
   };
 
 
-  struct not_octal_character_error : exception
+  struct not_octal_int_literal_error2 : exception
   {
-    not_octal_character_error (const input_stream & x)
-      : exception {x.generate_error ("8進数ではない文字")}
+    not_octal_int_literal_error2 (const input_stream & x)
+      : exception {x.generate_error ("not octal int literal")}
     {}
     using exception::what;
   };
@@ -55,10 +54,10 @@ namespace kizuna::parser
   };
 
 
-  struct not_hexadecimal_character_error : exception
+  struct not_hexadecimal_int_literal_error2 : exception
   {
-    not_hexadecimal_character_error (const input_stream & x)
-      : exception {x.generate_error ("16進数ではない文字")}
+    not_hexadecimal_int_literal_error2 (const input_stream & x)
+      : exception {x.generate_error ("not hexadecimal int literal")}
     {}
     using exception::what;
   };
@@ -82,15 +81,6 @@ namespace kizuna::parser
   };
 
 
-  struct not_illegal_double_literal_error : exception
-  {
-    not_illegal_double_literal_error (const input_stream & x)
-      : exception {x.generate_error ("不正なdouble型リテラル")}
-    {}
-    using exception::what;
-  };
-
-
   struct unknown_literal_suffix_error : exception
   {
     unknown_literal_suffix_error (const input_stream & x)
@@ -109,9 +99,9 @@ namespace kizuna::parser
   };
 
 
-  struct not_word_error : exception
+  struct not_identifier_error : exception
   {
-    not_word_error (const input_stream & x)
+    not_identifier_error (const input_stream & x)
       : exception {x.generate_error ("not word")}
     {}
     using exception::what;
@@ -204,7 +194,7 @@ namespace kizuna::parser
     // suffix check
     if (s.is_digit () || s.is_letter ())
     {
-      throw not_octal_character_error {s};
+      throw not_octal_int_literal_error2 {s};
     }
 
     return std::string {begin , s.get_iterator ()};
@@ -251,7 +241,7 @@ namespace kizuna::parser
     }
     else
     {
-      throw not_hexadecimal_character_error {s};
+      throw not_hexadecimal_int_literal_error2 {s};
     }
 
     // [0-9A-Fa-f]*
@@ -263,7 +253,7 @@ namespace kizuna::parser
     // suffix check
     if (s.is_letter ())
     {
-      throw not_hexadecimal_character_error {s};
+      throw not_hexadecimal_int_literal_error2 {s};
     }
 
     return std::string {begin , s.get_iterator ()};
@@ -273,6 +263,7 @@ namespace kizuna::parser
   inline auto parse_int_literal (input_stream & s)
   {
     auto backup = s;
+
     try
     {
       return parse_hexadecimal_int_literal (s);
@@ -300,7 +291,7 @@ namespace kizuna::parser
       // s = backup;
     }
 
-    throw not_int_literal_error (s);
+    throw not_int_literal_error {s};
   }
 
 
@@ -383,7 +374,7 @@ namespace kizuna::parser
 
 
   // [A-Za-z_][0-9A-Za-z_-]*
-  inline auto parse_word (input_stream & s)
+  inline auto parse_identifier (input_stream & s)
   {
     s.skip_spaces ();
     auto begin = s.get_iterator ();
@@ -395,7 +386,7 @@ namespace kizuna::parser
     }
     else
     {
-      throw not_word_error {s};
+      throw not_identifier_error {s};
     }
 
     // [0-9A-Za-z_-]*

@@ -5,28 +5,10 @@
 
 #include <kizuna/parser.hpp>
 
-namespace kizuna
-{
-  namespace ast
-  {
-    struct int_literal
-    {
-      std::int64_t value;
-      std::string suffix;
-
-      friend auto operator << (std::ostream & out , const int_literal & this_) -> decltype (auto)
-      {
-        out << this_.value << this_.suffix;
-        return (out);
-      }
-    };
-  } // namespace ast
-} // namespace kizuna
-
 
 inline auto parse (kizuna::input_stream & s)
 {
-  auto res = kizuna::parser::parse_word (s);
+  auto res = kizuna::parser::parse_literal (s);
   // kizuna::parse_eof (s);
   return res;
 }
