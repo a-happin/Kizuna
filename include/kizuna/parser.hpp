@@ -65,7 +65,7 @@ namespace kizuna
       using escape_sequence::red;
       using escape_sequence::yellow;
       //constexpr const char * error_string [] = {"\033[1;32msuggestion: " , "\033[1;33mwarning: " , "\033[1;31merror: "};
-      auto [current_line, line, col] = parser_helper::get_current_line_col (source, ite);
+      auto [current_line, line, col] = parser_helper::get_current_line_col (source, e.ite);
       std::ostringstream ss;
       ss << bold << source.filename << ":" << line << ":" << col << ": " << (bold | red) << "error" << reset << bold << ": " << e.message << std::endl;
       ss << reset << current_line << std::endl;

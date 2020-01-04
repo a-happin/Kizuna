@@ -12,7 +12,14 @@ auto main () -> int
   cin.tie (nullptr);
   ios_base::sync_with_stdio (false);
 
-  auto [result, rest] = kizuna::parse (cin);
-  cout << "parsed: " << result << endl;
-  cout << "rest: " << rest;
+  try
+  {
+    auto [result, rest] = kizuna::parse (cin, "(stdin)");
+    cout << "parsed: " << result << endl;
+    cout << "rest: " << rest;
+  }
+  catch (const std::runtime_error & e)
+  {
+    cerr << e.what () << endl;
+  }
 }

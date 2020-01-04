@@ -1,9 +1,16 @@
-#ifndef KIZUNA_OPTIONAL_EXTENSION_HPP
-#define KIZUNA_OPTIONAL_EXTENSION_HPP
+#ifndef KIZUNA_OPTIONAL_HPP
+#define KIZUNA_OPTIONAL_HPP
 
 #include <optional>
+#include <iterator>
 
-namespace kizuna::optional_extension
+namespace kizuna
+{
+  using std::optional;
+  using std::nullopt;
+} // namespace kizuna
+
+namespace std
 {
   template <typename T>
   constexpr auto begin (const std::optional <T> & opt) noexcept -> const T *
@@ -16,6 +23,6 @@ namespace kizuna::optional_extension
   {
     return opt ? & * opt + 1 : nullptr;
   }
-} // namespace kizuna::optional_extension
+} // namespace std
 
-#endif // KIZUNA_OPTIONAL_EXTENSION_HPP
+#endif // KIZUNA_OPTIONAL_HPP
