@@ -9,7 +9,9 @@
 
 namespace kizuna::parser
 {
+  // --------------------------------
   // 文字判別
+  // --------------------------------
   inline constexpr auto is_eof (const source_iterator & ite) noexcept
   {
     return ite.is_eof ();
@@ -52,7 +54,9 @@ namespace kizuna::parser
   }
 
 
+  // --------------------------------
   // skip
+  // --------------------------------
   inline auto skip_spaces (source_iterator & ite) -> void
   {
     while (is_space (ite)) ++ ite;
@@ -63,7 +67,12 @@ namespace kizuna::parser
   }
 
 
-  //rollback
+
+  // --------------------------------
+  // parser generator
+  // --------------------------------
+
+  // rollback
   template <typename F>
   inline constexpr auto rollback (F f)
   {
@@ -74,7 +83,7 @@ namespace kizuna::parser
       {
         return f (ite);
       }
-      catch (const exception & e)
+      catch (const parser_error & e)
       {
         ite = backup;
         throw e;
@@ -82,8 +91,9 @@ namespace kizuna::parser
     };
   }
 
-  template <typename F, typename G>
-  inline constexpr auto or_ (F f, G g)
+  // or
+  template <typename F>
+  inline constexpr auto or_ (F f)
   {
     return [=] (source_iterator & ite)
     {
@@ -92,36 +102,39 @@ namespace kizuna::parser
       {
         return f (ite);
       }
-      catch (const exception &)
+      catch (const parser_error & e)
       {
         ite = backup;
+        throw e;
       }
+    };
+  }
+  template <typename F, typename ... Rest>
+  inline constexpr auto or_ (F f, Rest ... rest)
+  {
+    return [=] (source_iterator & ite)
+    {
+      auto backup = ite;
       try
       {
-        return g (ite);
+        return f (ite);
       }
-      catch (const exception & e2)
+      catch (const parser_error & e1)
       {
         ite = backup;
-        throw e2;
+        try
+        {
+          return or_ (rest ...) (ite);
+        }
+        catch (const parser_error & e2)
+        {
+          throw e1 | e2;
+        }
       }
     };
   }
 
-
-  // parse
-  inline auto parse_anychar (source_iterator & ite) -> char
-  {
-    if (is_eof (ite))
-    {
-      throw exception ("too short", ite);
-    }
-    else
-    {
-      return * ite ++;
-    }
-  }
-
+  // parse_char
   inline constexpr auto parse_char (char c)
   {
     return [=] (source_iterator & ite) -> optional <char> {
@@ -131,6 +144,7 @@ namespace kizuna::parser
     };
   }
 
+  // parse_char (range version)
   inline constexpr auto parse_char (const std::pair <char, char> & range)
   {
     return [=] (source_iterator & ite) -> optional <char>
@@ -141,37 +155,62 @@ namespace kizuna::parser
     };
   }
 
-  inline auto parse_digits = rollback ([] (source_iterator & ite)
+  // parse_char (or version)
+  inline constexpr auto parse_char_or (char c1, char c2)
   {
-      skip_spaces (ite);
-      std::stringstream ss;
-      if (is_digit (ite))
-      {
-        ss << * ite ++;
-      }
-      else
-      {
-        throw exception ("parse_digits: not digit", ite);
-      }
-      while (is_digit (ite)) ss << * ite ++;
-      return ss.str ();
-  });
+    return [=] (source_iterator & ite) -> optional <char> {
+      if (is_eof (ite)) return nullopt;
+      if (* ite == c1 || * ite == c2) return * ite ++;
+      else return nullopt;
+    };
+  }
 
-  // -?[1-9][0-9]|0
-  inline auto parse_decimal_int_literal = rollback ([] (source_iterator & ite)
+
+  // --------------------------------
+  // parse
+  // --------------------------------
+  inline auto parse_anychar (source_iterator & ite) -> char
+  {
+    if (is_eof (ite))
+    {
+      throw parser_error {"expected any char, but too short", ite};
+    }
+    else
+    {
+      return * ite ++;
+    }
+  }
+
+  inline constexpr auto parse_unary_minus = parse_char ('-');
+  inline constexpr auto parse_0 = parse_char ('0');
+
+  // -?(0|[1-9][0-9]*)
+  inline auto parse_decimal_int_literal (source_iterator & ite)
   {
     skip_spaces (ite);
     auto first = ite;
 
     // -?
-    constexpr auto parse_unary_minus = parse_char ('-');
     parse_unary_minus (ite);
 
+    // 0
+    if (parse_0 (ite))
+    {
+      if (is_letter_tail (ite))
+      {
+        throw parser_error {"unknown literal suffix.", ite};
+      }
+      else
+      {
+        return std::string {first, ite};
+      }
+    }
+
     // [1-9]
-    constexpr auto parse_1_to_9 = parse_char (std::make_pair ('1', '9'));
+    constexpr auto parse_1_to_9 = parse_char ({'1', '9'});
     if (not parse_1_to_9 (ite))
     {
-      throw exception {"expected digit, but not digit", ite};
+      throw parser_error {"expected digit, but not digit.", ite};
     }
 
     // [0-9]*
@@ -180,16 +219,89 @@ namespace kizuna::parser
     // suffix check
     if (is_letter_tail (ite))
     {
-      throw exception {"unknown literal suffix.", ite};
+      throw parser_error {"unknown literal suffix.", ite};
     }
 
     return std::string {first, ite};
-  });
+  }
+
+  // 0[0-7]+
+  inline auto parse_octal_int_literal (source_iterator & ite)
+  {
+    skip_spaces (ite);
+    auto first = ite;
+
+    // -?
+    parse_unary_minus (ite);
+
+    // 0
+    if (not parse_0 (ite))
+    {
+      throw parser_error {"expected octal digit, but not octal digit.", ite};
+    }
+
+    // [0-7]+
+    constexpr auto parse_0_7 = parse_char ({'0', '7'});
+    if (! parse_0_7 (ite))
+    {
+      throw parser_error {"expected octal digit, but not octal digit.", ite};
+    }
+    while (parse_0_7 (ite));
+
+    // suffix check
+    if (is_letter_tail (ite))
+    {
+      throw parser_error {"unknown literal suffix.", ite};
+    }
+
+    return std::string {first, ite};
+  }
+
+  // -?0[Xx][0-9A-Fa-f]+
+  inline auto parse_hexadecimal_int_literal (source_iterator & ite)
+  {
+    skip_spaces (ite);
+    auto first = ite;
+
+    // -?
+    parse_unary_minus (ite);
+
+    // 0
+    if (not parse_0 (ite))
+    {
+      throw parser_error {"expected hexadecimal digit, but not hexadecimal digit.", ite};
+    }
+
+    // [Xx]
+    auto parse_x = parse_char_or ('X', 'x');
+    if (not parse_x (ite))
+    {
+      throw parser_error {"expected hexadecimal digit, but not hexadecimal digit.", ite};
+    }
+
+    // [0-9A-Fa-f]+
+    auto is_hexadecimal_digit = [] (char x) {
+      return ('0' <= x && x <= '9') || ('A' <= x && x <= 'F') || ('a' <= x && x <= 'f');
+    };
+    if (is_eof (ite) || ! is_hexadecimal_digit (* ite))
+    {
+      throw parser_error {"expected hexadecimal digit, but not hexadecimal digit.", ite};
+    }
+    while (! is_eof (ite) && is_hexadecimal_digit (* ite)) ++ ite;
+
+    // suffix check
+    if (is_letter_tail (ite))
+    {
+      throw parser_error {"unknown literal suffix.", ite};
+    }
+
+    return std::string {first, ite};
+  }
 
   inline auto parse_int_literal (source_iterator & ite)
   {
     skip_spaces (ite);
-    return parse_decimal_int_literal (ite);
+    return or_ (parse_decimal_int_literal, parse_octal_int_literal, parse_hexadecimal_int_literal) (ite);
   };
 
   inline auto parse_keyword (const std::string & word, source_iterator & ite) -> bool
@@ -199,12 +311,12 @@ namespace kizuna::parser
     {
       if (ite.is_eof ())
       {
-        throw exception ("parse_keyword: too short", ite);
+        throw parser_error {"parse_keyword: too short", ite};
       }
       if (elem != * ite)
       {
         ite = ite_backup;
-        throw exception ("parse_keyword: expected keyword ", ite);
+        throw parser_error {"parse_keyword: expected keyword ", ite};
       }
       ++ ite;
     }
