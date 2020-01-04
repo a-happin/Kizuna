@@ -53,6 +53,15 @@ namespace kizuna::parser
     return is_space_noendline (ite) || is_endline (ite);
   }
 
+  inline constexpr auto is_octal_digit (const source_iterator & ite) noexcept
+  {
+    return ! is_eof (ite) && '0' <= * ite && * ite <= '7';
+  }
+  inline constexpr auto is_hexadecimal_digit (const source_iterator & ite) noexcept
+  {
+    return ! is_eof (ite) && (('0' <= * ite && * ite <= '9') || ('A' <= * ite && * ite <= 'F') || ('a' <= * ite && * ite <= 'f'));
+  }
+
 
   // --------------------------------
   // skip
@@ -241,12 +250,9 @@ namespace kizuna::parser
     }
 
     // [0-7]+
-    constexpr auto parse_0_7 = parse_char ({'0', '7'});
-    if (! parse_0_7 (ite))
-    {
-      throw parser_error {"expected octal digit, but not octal digit.", ite};
-    }
-    while (parse_0_7 (ite));
+    if (is_octal_digit (ite)) ++ ite;
+    else throw parser_error {"expected octal digit, but not octal digit.", ite};
+    while (is_octal_digit (ite)) ++ ite;
 
     // suffix check
     if (is_letter_tail (ite))
@@ -280,14 +286,9 @@ namespace kizuna::parser
     }
 
     // [0-9A-Fa-f]+
-    auto is_hexadecimal_digit = [] (char x) {
-      return ('0' <= x && x <= '9') || ('A' <= x && x <= 'F') || ('a' <= x && x <= 'f');
-    };
-    if (is_eof (ite) || ! is_hexadecimal_digit (* ite))
-    {
-      throw parser_error {"expected hexadecimal digit, but not hexadecimal digit.", ite};
-    }
-    while (! is_eof (ite) && is_hexadecimal_digit (* ite)) ++ ite;
+    if (is_hexadecimal_digit (ite)) ++ ite;
+    else throw parser_error {"expected hexadecimal digit, but not hexadecimal digit.", ite};
+    while (is_hexadecimal_digit (ite)) ++ ite;
 
     // suffix check
     if (is_letter_tail (ite))
@@ -298,6 +299,7 @@ namespace kizuna::parser
     return std::string {first, ite};
   }
 
+  // int literal
   inline auto parse_int_literal (source_iterator & ite)
   {
     skip_spaces (ite);
