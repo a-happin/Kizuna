@@ -5,31 +5,16 @@
 
 namespace kizuna
 {
-
   struct exception
   {
+    std::string message;
 
-  private:
-    std::string s;
-
-  public:
-
-    exception (const std::string & x)
-      : s {x}
-    {}
-
-    exception (std::string && x) noexcept
-      : s {std::move (x)}
-    {}
-
-    auto what () const noexcept -> const std::string &
+    auto what () const noexcept -> decltype (auto)
     {
-      return (s);
+      return message;
     }
   };
-
 }
 
 #endif
-
 
